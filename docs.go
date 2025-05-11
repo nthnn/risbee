@@ -23,7 +23,7 @@ Usage Overview:
   1. Instantiate RisbeeVm and call Initialize() to set up PC, exit code,
 and syscall table.
   2. Load a RISC-V binary into VM memory at the load offset (4096) using
-LoadFile(fileName); on success, the stack pointer (R2) is set to memory top.
+LoadFromBytes([]byte); on success, the stack pointer (R2) is set to memory top.
   3. Optionally register custom syscalls: SetSystemCall(addr, handler).
   4. Execute the program with Run(), which fetches and executes
 instructions until StopVM() is called or an exit syscall occurs.
