@@ -91,8 +91,7 @@ func main() {
 ### Key Methods
 
 - `Initialize()`: Reset PC, exit code, running flag, and syscall table.
-- `LoadFile(fileName string) bool`: Load a binary into memory at 0x1000.
-- `LoadFromBytes(data []byte) bool`: Load raw bytes into VM memory.
+- `LoadFromBytes(data []byte) bool`: Load raw bytes at 0x1000 into VM memory.
 - `SetSystemCall(code uint64, fn RisbeeVmSyscallFn)`: Register a syscall handler.
 - `GetPointerParam(idx uint64) uint64`: Read syscall argument from a0+idx.
 - `GetStringPointer(ptr uint64) string`: Read null-terminated string from VM memory.
