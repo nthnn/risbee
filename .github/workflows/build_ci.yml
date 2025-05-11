@@ -1,0 +1,20 @@
+name: Build Risbee
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        run: sudo apt install golang-go
+
+      - name: Go version
+        run: go version
+
+      - name: Build the project
+        run: |
+          go build -ldflags="-s -w" examples/main.go
