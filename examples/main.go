@@ -40,6 +40,16 @@ import (
 	"github.com/nthnn/risbee"
 )
 
+// readFile reads an entire file into memory.
+func readFile(fileName string) ([]byte, error) {
+	data, err := os.ReadFile(fileName)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	return data, nil
+}
+
 func main() {
 	// Ensure a filename is provided as an argument.
 	if len(os.Args) < 2 {
@@ -49,7 +59,13 @@ func main() {
 
 	// Create and initialize the VM.
 	vm := &risbee.RisbeeVm{}
-	vm.Initialize()
+
+	// Set up the VM with exit and panic handlers.
+	vm.Initialize(func(exitCode uint64) {
+		os.Exit(int(exitCode))
+	}, func(message string) {
+		fmt.Printf("\r\n%s\r\n", message)
+	})
 
 	// Register a simple "print" syscall at code 1.
 	// When invoked, it reads a string pointer from a0,
@@ -61,8 +77,15 @@ func main() {
 		return ptr
 	})
 
+	// Load the binary file.
+	binary, err := readFile(os.Args[1])
+	if err != nil {
+		fmt.Printf("Error: %v\r\n", err)
+		os.Exit(-1)
+	}
+
 	// Load the RISC-V binary into VM memory; exit on failure.
-	if !vm.LoadFile(os.Args[1]) {
+	if !vm.LoadFromBytes(binary) {
 		fmt.Println("Failed to load file:", os.Args[1])
 		os.Exit(1)
 	}
