@@ -6,12 +6,6 @@
 
 package risbee
 
-import (
-	"encoding/binary"
-	"fmt"
-	"os"
-)
-
 const (
 	// RISBEE_STACK_SIZE defines the total size of the VM memory (64 KiB).
 	RISBEE_STACK_SIZE = 65536
@@ -24,21 +18,34 @@ type RisbeeVmSyscallFn func(vm *RisbeeVm) uint64
 // It includes memory, registers, program counter, exit code, running status,
 // and a map of registered syscall handlers.
 type RisbeeVm struct {
-	Memory    [RISBEE_STACK_SIZE]byte      // Byte-addressable VM memory
-	Registers [32]uint64                   // General-purpose registers R0–R31
-	Pc        uint64                       // Program counter
-	ExitCode  int                          // Exit code of the VM
-	Running   bool                         // VM running status
-	SysCalls  map[uint64]RisbeeVmSyscallFn // Registered syscalls
+	Memory        [RISBEE_STACK_SIZE]byte      // Byte-addressable VM memory
+	Registers     [32]uint64                   // General-purpose registers R0–R31
+	Pc            uint64                       // Program counter
+	ExitCode      int                          // Exit code of the VM
+	Running       bool                         // VM running status
+	SysCalls      map[uint64]RisbeeVmSyscallFn // Registered syscalls
+	ExitCallback  func(uint64)                 // Exit system call callback function
+	PanicCallback func(string)                 // Panic callback function
 }
 
 // This function initializes the Risbee virtual machine
 // instance. It sets up the initial state of the virtual machine.
-func (vm *RisbeeVm) Initialize() {
+//
+// Parameters:
+//   - exitCallback Callback triggered when system
+//     call for exit is invoked
+//   - panicCallback Callback for encountered panic errors
+func (vm *RisbeeVm) Initialize(
+	exitCallback func(uint64),
+	panicCallback func(string),
+) {
 	vm.Pc = 4096
 	vm.ExitCode = 0
 	vm.Running = false
 	vm.SysCalls = map[uint64]RisbeeVmSyscallFn{}
+
+	vm.ExitCallback = exitCallback
+	vm.PanicCallback = panicCallback
 }
 
 // Stops the execution of the virtual machine.
@@ -52,40 +59,6 @@ func (vm *RisbeeVm) Stop() {
 // Returns the exit code.
 func (vm *RisbeeVm) GetExitCode() int {
 	return vm.ExitCode
-}
-
-// This function loads the program file specified by fileName into the
-// Risbee virtual machine instance. It checks if the file exists and is
-// readable, then loads its contents into the memory of the virtual machine
-// for execution.
-func (vm *RisbeeVm) LoadFile(FileName string) bool {
-	file, err := os.Open(FileName)
-	if err != nil {
-		return false
-	}
-	defer file.Close()
-
-	fileInfo, err := file.Stat()
-	if err != nil {
-		return false
-	}
-	fileSize := fileInfo.Size()
-
-	const loadOffset = 4096
-	if uint64(fileSize) > RISBEE_STACK_SIZE-loadOffset {
-		return false
-	}
-
-	bytesRead, err := file.Read(
-		vm.Memory[loadOffset : loadOffset+int(fileSize)],
-	)
-
-	if err != nil || int64(bytesRead) != fileSize {
-		return false
-	}
-
-	vm.Registers[2] = RISBEE_STACK_SIZE
-	return true
 }
 
 // It copies the contents of `data` into the VM’s internal
@@ -189,7 +162,9 @@ func (vm *RisbeeVm) setExitCode(exitCode int) {
 // message and performs any necessary cleanup before
 // terminating the program.
 func (vm *RisbeeVm) panic(message string) {
-	fmt.Printf("\r\n%s\r\n", message)
+	if vm.PanicCallback != nil {
+		vm.PanicCallback(message)
+	}
 
 	vm.Stop()
 	vm.setExitCode(-1)
@@ -203,7 +178,7 @@ func (vm *RisbeeVm) panic(message string) {
 //
 // Returns the next instruction to be executed.
 func (vm *RisbeeVm) fetch() uint32 {
-	return binary.LittleEndian.Uint32(
+	return uint32LittleEndian(
 		vm.Memory[vm.Pc : vm.Pc+4],
 	)
 }
@@ -221,9 +196,12 @@ func (vm *RisbeeVm) fetch() uint32 {
 func (vm *RisbeeVm) handleSyscall(code uint64) uint64 {
 	if code == 0 {
 		exitCode := int(vm.GetPointerParam(0))
-
 		vm.setExitCode(exitCode)
-		os.Exit(exitCode)
+
+		if vm.ExitCallback != nil {
+			vm.ExitCallback(uint64(exitCode))
+			vm.Stop()
+		}
 
 		return uint64(exitCode)
 	} else if fn, ok := vm.SysCalls[code]; ok {
@@ -258,17 +236,17 @@ func (vm *RisbeeVm) execute(inst uint32) {
 			val = int64(int8(vm.Memory[addr]))
 
 		case RISBEE_FC3_LHW:
-			val = int64(int16(binary.LittleEndian.Uint16(
+			val = int64(int16(uint16LittleEndian(
 				vm.Memory[addr:],
 			)))
 
 		case RISBEE_FC3_LW:
-			val = int64(int32(binary.LittleEndian.Uint32(
+			val = int64(int32(uint32LittleEndian(
 				vm.Memory[addr:],
 			)))
 
 		case RISBEE_FC3_LDW:
-			val = int64(binary.LittleEndian.Uint64(
+			val = int64(uint64LittleEndian(
 				vm.Memory[addr:],
 			))
 
@@ -276,12 +254,12 @@ func (vm *RisbeeVm) execute(inst uint32) {
 			val = int64(vm.Memory[addr])
 
 		case RISBEE_FC3_LHU:
-			val = int64(binary.LittleEndian.Uint16(
+			val = int64(uint16LittleEndian(
 				vm.Memory[addr:],
 			))
 
 		case RISBEE_FC3_LRES:
-			val = int64(binary.LittleEndian.Uint32(
+			val = int64(uint32LittleEndian(
 				vm.Memory[addr:],
 			))
 
@@ -310,19 +288,19 @@ func (vm *RisbeeVm) execute(inst uint32) {
 			vm.Memory[addr] = byte(val)
 
 		case RISBEE_FC3_SHW:
-			binary.LittleEndian.PutUint16(
+			putUint16(
 				vm.Memory[addr:],
 				uint16(val),
 			)
 
 		case RISBEE_FC3_SW:
-			binary.LittleEndian.PutUint32(
+			putUint32(
 				vm.Memory[addr:],
 				uint32(val),
 			)
 
 		case RISBEE_FC3_SDW:
-			binary.LittleEndian.PutUint64(
+			putUint64(
 				vm.Memory[addr:],
 				val,
 			)
