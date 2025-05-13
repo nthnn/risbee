@@ -6,11 +6,6 @@
 
 package risbee
 
-const (
-	// RISBEE_STACK_SIZE defines the total size of the VM memory (64 KiB).
-	RISBEE_STACK_SIZE = 65536
-)
-
 // RisbeeVmSyscallFn represents the signature of a syscall handler function.
 type RisbeeVmSyscallFn func(vm *RisbeeVm) uint64
 
@@ -18,7 +13,7 @@ type RisbeeVmSyscallFn func(vm *RisbeeVm) uint64
 // It includes memory, registers, program counter, exit code, running status,
 // and a map of registered syscall handlers.
 type RisbeeVm struct {
-	Memory        [RISBEE_STACK_SIZE]byte      // Byte-addressable VM memory
+	Memory        []byte                       // Byte-addressable VM memory
 	Registers     [32]uint64                   // General-purpose registers R0–R31
 	Pc            uint64                       // Program counter
 	ExitCode      int                          // Exit code of the VM
@@ -66,16 +61,16 @@ func (vm *RisbeeVm) GetExitCode() int {
 // mirroring the behavior of LoadFile but without disk I/O.
 func (vm *RisbeeVm) LoadFromBytes(Data []byte) bool {
 	const loadOffset = 4096
-	size := len(Data)
 
-	if size == 0 ||
-		uint64(size) > RISBEE_STACK_SIZE-loadOffset {
+	size := len(Data)
+	if size == 0 {
 		return false
 	}
 
-	copy(vm.Memory[loadOffset:loadOffset+size], Data)
-	vm.Registers[2] = RISBEE_STACK_SIZE
+	vm.Memory = make([]byte, loadOffset+size)
+	vm.Registers[2] = uint64(size)
 
+	copy(vm.Memory[loadOffset:loadOffset+size], Data)
 	return true
 }
 
