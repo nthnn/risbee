@@ -178,6 +178,14 @@ func (vm *RisbeeVm) panic(message string) {
 //
 // Returns the next instruction to be executed.
 func (vm *RisbeeVm) fetch() uint32 {
+	pc := int(vm.Pc)
+	if pc < 0 || pc+4 > len(vm.Memory) {
+		vm.PanicCallback("PC out of range")
+		vm.Stop()
+
+		return 0
+	}
+
 	return uint32LittleEndian(
 		vm.Memory[vm.Pc : vm.Pc+4],
 	)
