@@ -6,7 +6,7 @@
 ![Build CI](https://github.com/nthnn/risbee/actions/workflows/build_ci.yml/badge.svg)
 [![License](https://img.shields.io/badge/license-MIT-blue)](https://opensource.org/license/mit)
 
-Risbee is a small, self-contained virtual machine that draws inspiration from the RISC-V instruction set. Built in Go, it offers a simple and approachable way to experiment with low-level concepts like registers, memory management, and instruction decoding. With just 64 KiB of byte-addressable memory and 32 general-purpose registers, Risbee keeps its footprint minimal while still supporting a rich subset of operations—everything from basic loads and stores to arithmetic, branching, and even custom syscalls.
+Risbee is a small, self-contained virtual machine that draws inspiration from the RISC-V instruction set. Built in Go, it offers a simple and approachable way to experiment with low-level concepts like registers, memory management, and instruction decoding. With just few kilobytes of byte-addressable memory and 32 general-purpose registers, Risbee keeps its footprint minimal while still supporting a rich subset of operations—everything from basic loads and stores to arithmetic, branching, and even custom syscalls.
 
 You don’t need to be a seasoned compiler engineer or hardware expert to get started. Risbee’s design emphasizes clarity: the VM initializes with a clear default state, lets you load a binary or raw byte slice into memory at a fixed offset, and then runs a straightforward fetch-decode-execute loop. If you want to print text, handle I/O, or integrate with your Go application in other ways, you simply register a Go function as a syscall handler, and Risbee will invoke it whenever your code calls an environment call instruction.
 
@@ -28,7 +28,7 @@ All you need is a Go workspace and a compiled RISC-V binary (or a simple byte ar
     - Retrieve string and pointer parameters with `GetStringPointer` and `GetPointerParam`.
     - Built-in exit syscall (`code 0` uses R10 for status).
 - **Memory & Registers**
-    - 64 KiB contiguous memory (`[65536]byte`)
+    - Dynamic kilobytes contiguous memory (`[]byte`)
     - 32 × 64-bit registers (R0 read-only zero)
     - Program Counter initialized to `0x1000`
     - Stack Pointer (`R2`) auto-set to top of memory on load
@@ -101,7 +101,7 @@ func main() {
 
 ## Memory Layout
 
-The VM reserves the first 4 KiB (0x0000–0x0FFF) as a “reserved” region that you can use for static data, heap, or simply leave untouched. At address 0x1000, the VM begins loading your program image, and everything from 0x1000 up to the end of the 64 KiB space (0xFFFF) is available for code, global variables, stack, and heap allocations. By convention, the stack pointer (register R2) is initialized to the very top of memory (0x10000), allowing your program to grow the stack downward into the unused upper region.
+The VM reserves the first 4 KiB (0x0000–0x0FFF) as a “reserved” region that you can use for static data, heap, or simply leave untouched. At address 0x1000, the VM begins loading your program image, and everything from 0x1000 up to the end of the space is available for code, global variables, stack, and heap allocations. By convention, the stack pointer (register R2) is initialized to the very top of memory (0x10000), allowing your program to grow the stack downward into the unused upper region.
 
 ```
 0x0000 ─────────────────────────── Reserved (data/heap)
@@ -114,8 +114,7 @@ The VM reserves the first 4 KiB (0x0000–0x0FFF) as a “reserved” region tha
    │   • Uninitialized data (.bss)
    │   • Heap (grows upward)
    │   • Stack (grows downward, SP=R2 starts at 0x10000)
-0xFFFF ─────────────────────────── End of VM memory (64 KiB total)
-
+  ...  ─────────────────────────── End of VM memory
 ```
 
 - **Load Offset (`0x1000`)**: All binaries and raw byte slices are copied here.
