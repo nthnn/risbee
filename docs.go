@@ -9,8 +9,7 @@ operations (both 32- and 64-bit variants), control flow (branches, jumps),
 and environment calls (syscalls).
 
 Key Features:
-  - Fixed Memory: 64 KiB of memory for program code and data, with a
-default code load offset at 0x1000 (4096).
+  - Fixed Memory: Default code load offset at 0x1000 (4096).
   - 32 General-Purpose Registers: 64-bit registers R0–R31, with R0
 hardwired to zero (writes ignored).
   - Program Counter (PC): 64-bit PC initialized to 0x1000; increments
@@ -31,7 +30,7 @@ instructions until StopVM() is called or an exit syscall occurs.
 
 Memory Layout:
   - 0x0000–0x0FFF: Reserved or available for data.
-  - 0x1000–0xFFFF: Program image, heap, and stack.
+  - 0x1000:        Program image, heap, and stack.
 
 Syscall Mechanism:
   - ECALL encoded in the CALL instruction family; a0 (R10) holds the syscall code.
@@ -41,8 +40,7 @@ Error Handling:
   - Invalid instructions or memory accesses invoke panic(), printing an error,
 stopping the VM, and setting exit code to -1.
 
-Constants and Types:
-  - RISBEE_STACK_SIZE: Total VM memory size (64 KiB).
+Types:
   - RisbeeVmSyscallFn: Callback signature for syscall handlers.
   - RisbeeVm: Core struct encapsulating VM state, memory, registers, PC, and syscalls.
 */
